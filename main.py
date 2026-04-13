@@ -9,13 +9,12 @@ import os
 # ======== MediaPipe 初始化 (增加錯誤捕捉) ========
 try:
     import mediapipe as mp
-    # 如果 mp 存在，嘗試直接存取 solutions
     mp_pose = mp.solutions.pose
     mp_drawing = mp.solutions.drawing_utils
     mp_drawing_styles = mp.solutions.drawing_styles
 except (ImportError, AttributeError) as e:
 
-    # 如果標準載入失敗，嘗試直接從 python 路徑強行載入
+    # use deep import to provide more detailed error information
     try:
         import mediapipe.python.solutions.pose as mp_pose
         import mediapipe.python.solutions.drawing_utils as mp_drawing
@@ -25,7 +24,7 @@ except (ImportError, AttributeError) as e:
         st.warning(f"初步錯誤: {e}")
         st.warning(f"深層錯誤: {inner_e}")
         
-        # 顯示已安裝套件清單，幫香草確認 NumPy 版本
+        # display installed packages for debugging
         import subprocess
         result = subprocess.run([sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True)
         with st.expander("查看目前安裝套件 (Debug Use)"):
