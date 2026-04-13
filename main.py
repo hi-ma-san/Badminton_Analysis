@@ -10,9 +10,15 @@ import os
 
 # ======== MediaPipe 初始化 (增加錯誤捕捉) ========
 try:
-    mp_pose = mp.solutions.pose
-    mp_drawing = mp.solutions.drawing_utils
-    mp_drawing_styles = mp.solutions.drawing_styles
+    # 嘗試顯式導入子模組，這能解決大多數 Linux 環境下 mp.solutions 缺失的問題
+    import mediapipe.python.solutions.pose as mp_pose_mod
+    import mediapipe.python.solutions.drawing_utils as mp_drawing_mod
+    import mediapipe.python.solutions.drawing_styles as mp_drawing_styles_mod
+    
+    mp_pose = mp_pose_mod
+    mp_drawing = mp_drawing_mod
+    mp_drawing_styles = mp_drawing_styles_mod
+    
 except Exception as e:
     st.error("MediaPipe 載入失敗！")
     
