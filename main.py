@@ -10,31 +10,19 @@ import os
 
 # ======== MediaPipe 初始化 (增加錯誤捕捉) ========
 try:
-    # 嘗試顯式導入子模組，這能解決大多數 Linux 環境下 mp.solutions 缺失的問題
-    import mediapipe.python.solutions.pose as mp_pose_mod
-    import mediapipe.python.solutions.drawing_utils as mp_drawing_mod
-    import mediapipe.python.solutions.drawing_styles as mp_drawing_styles_mod
+    mp_pose = mp.solutions.pose
+    mp_drawing = mp.solutions.drawing_utils
+    mp_drawing_styles = mp.solutions.drawing_styles
     
-    mp_pose = mp_pose_mod
-    mp_drawing = mp_drawing_mod
-    mp_drawing_styles = mp_drawing_styles_mod
-    
+except AttributeError:
+    # 如果 mp 沒有 solutions 屬性，通常是因為安裝不完全或版本衝突
+    st.error("MediaPipe 結構異常")
+    st.stop()
 except Exception as e:
     st.error("MediaPipe 載入失敗！")
-    
-    # 輸出具體的錯誤類型和訊息
     st.warning(f"具體錯誤: {type(e).__name__}: {e}")
-    
-    # 如果是 ImportError，通常會顯示缺少哪個系統函式庫
-    if "libGL.so" in str(e) or "libgl" in str(e).lower():
-        st.info("缺少 OpenGL 相關套件")
-    elif "libglib" in str(e).lower():
-        st.info("缺少 glib 相關套件")
-    
-    # 展開詳細的錯誤追蹤 (Traceback)，這對香草幫主人 debug 很有幫助
     with st.expander("查看詳細錯誤追蹤 (Traceback)"):
         st.code(traceback.format_exc())
-        
     st.stop()
 
 
