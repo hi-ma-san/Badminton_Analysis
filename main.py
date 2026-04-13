@@ -1,8 +1,6 @@
 import traceback
-
 import streamlit as st
 import cv2
-import mediapipe as mp
 import numpy as np
 from collections import deque
 import tempfile
@@ -10,19 +8,27 @@ import os
 
 # ======== MediaPipe 初始化 (增加錯誤捕捉) ========
 try:
-    mp_pose = mp.solutions.pose
-    mp_drawing = mp.solutions.drawing_utils
-    mp_drawing_styles = mp.solutions.drawing_styles
+    import mediapipe as mp
+    # 如果 mp 裡面沒有 solutions，試著從更深層的路徑抓取
+    if not hasattr(mp, 'solutions'):
+        from mediapipe.python.solutions import pose as mp_pose
+        from mediapipe.python.solutions import drawing_utils as mp_drawing
+        from mediapipe.python.solutions import drawing_styles as mp_drawing_styles
+    else:
+        mp_pose = mp.solutions.pose
+        mp_drawing = mp.solutions.drawing_utils
+        mp_drawing_styles = mp.solutions.drawing_styles
+
     
-except AttributeError:
-    # 如果 mp 沒有 solutions 屬性，通常是因為安裝不完全或版本衝突
-    st.error("MediaPipe 結構異常")
-    st.stop()
 except Exception as e:
-    st.error("MediaPipe 載入失敗！")
-    st.warning(f"具體錯誤: {type(e).__name__}: {e}")
-    with st.expander("查看詳細錯誤追蹤 (Traceback)"):
-        st.code(traceback.format_exc())
+    st.error("MediaPipe 最終載入失敗")
+    st.code(f"Error type: {type(e).__name__}")
+    st.code(f"Error message: {e}")
+    
+    import pkg_resources
+    installed_packages = [f"{d.project_name}=={d.version}" for d in pkg_resources.working_set]
+    with st.expander("查看雲端環境已安裝套件"):
+        st.write(installed_packages)
     st.stop()
 
 
