@@ -1,4 +1,4 @@
-import traceback
+import sys
 import streamlit as st
 import cv2
 import numpy as np
@@ -7,29 +7,30 @@ import tempfile
 import os
 
 # ======== MediaPipe 初始化 (增加錯誤捕捉) ========
-try:
-    import mediapipe as mp
-    # 如果 mp 裡面沒有 solutions，試著從更深層的路徑抓取
-    if not hasattr(mp, 'solutions'):
+@st.cache_resource
+def load_mediapipe():
+    try:
+        # 標準載入
+        import mediapipe as mp
+        if hasattr(mp, 'solutions'):
+            return mp.solutions.pose, mp.solutions.drawing_utils, mp.solutions.drawing_styles
+        
+        # 如果 mp 存在但沒 solutions，強制從內部路徑抓取
         from mediapipe.python.solutions import pose as mp_pose
         from mediapipe.python.solutions import drawing_utils as mp_drawing
         from mediapipe.python.solutions import drawing_styles as mp_drawing_styles
-    else:
-        mp_pose = mp.solutions.pose
-        mp_drawing = mp.solutions.drawing_utils
-        mp_drawing_styles = mp.solutions.drawing_styles
+        return mp_pose, mp_drawing, mp_drawing_styles
+        
+    except Exception as e:
+        # 第三階段：回報詳細環境資訊
+        st.error("MediaPipe 載入失敗")
+        st.code(f"錯誤訊息: {e}")
+        st.write("Python 搜尋路徑 (sys.path):")
+        st.code(sys.path)
+        st.stop()
 
-    
-except Exception as e:
-    st.error("MediaPipe 最終載入失敗")
-    st.code(f"Error type: {type(e).__name__}")
-    st.code(f"Error message: {e}")
-    
-    import pkg_resources
-    installed_packages = [f"{d.project_name}=={d.version}" for d in pkg_resources.working_set]
-    with st.expander("查看雲端環境已安裝套件"):
-        st.write(installed_packages)
-    st.stop()
+# 執行載入
+mp_pose, mp_drawing, mp_drawing_styles = load_mediapipe()
 
 
 def calculate_angle(a, b, c):
