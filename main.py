@@ -1,3 +1,5 @@
+import traceback
+
 import streamlit as st
 import cv2
 import mediapipe as mp
@@ -11,8 +13,22 @@ try:
     mp_pose = mp.solutions.pose
     mp_drawing = mp.solutions.drawing_utils
     mp_drawing_styles = mp.solutions.drawing_styles
-except AttributeError:
-    st.error("MediaPipe 模組載入失敗，請檢查 packages.txt 是否包含 libgl1-mesa-glx")
+except Exception as e:
+    st.error("MediaPipe 載入失敗！")
+    
+    # 輸出具體的錯誤類型和訊息
+    st.warning(f"具體錯誤: {type(e).__name__}: {e}")
+    
+    # 如果是 ImportError，通常會顯示缺少哪個系統函式庫
+    if "libGL.so" in str(e) or "libgl" in str(e).lower():
+        st.info("缺少 OpenGL 相關套件")
+    elif "libglib" in str(e).lower():
+        st.info("缺少 glib 相關套件")
+    
+    # 展開詳細的錯誤追蹤 (Traceback)，這對香草幫主人 debug 很有幫助
+    with st.expander("查看詳細錯誤追蹤 (Traceback)"):
+        st.code(traceback.format_exc())
+        
     st.stop()
 
 
