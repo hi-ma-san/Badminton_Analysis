@@ -7,30 +7,30 @@ import tempfile
 import os
 
 # ======== MediaPipe 初始化 (增加錯誤捕捉) ========
-@st.cache_resource
-def load_mediapipe():
-    try:
-        # 標準載入
-        import mediapipe as mp
-        if hasattr(mp, 'solutions'):
-            return mp.solutions.pose, mp.solutions.drawing_utils, mp.solutions.drawing_styles
-        
-        # 如果 mp 存在但沒 solutions，強制從內部路徑抓取
-        from mediapipe.python.solutions import pose as mp_pose
-        from mediapipe.python.solutions import drawing_utils as mp_drawing
-        from mediapipe.python.solutions import drawing_styles as mp_drawing_styles
-        return mp_pose, mp_drawing, mp_drawing_styles
-        
-    except Exception as e:
-        # 第三階段：回報詳細環境資訊
-        st.error("MediaPipe 載入失敗")
-        st.code(f"錯誤訊息: {e}")
-        st.write("Python 搜尋路徑 (sys.path):")
-        st.code(sys.path)
-        st.stop()
+try:
+    import mediapipe as mp
+    # 如果 mp 存在，嘗試直接存取 solutions
+    mp_pose = mp.solutions.pose
+    mp_drawing = mp.solutions.drawing_utils
+    mp_drawing_styles = mp.solutions.drawing_styles
+except (ImportError, AttributeError) as e:
 
-# 執行載入
-mp_pose, mp_drawing, mp_drawing_styles = load_mediapipe()
+    # 如果標準載入失敗，嘗試直接從 python 路徑強行載入
+    try:
+        import mediapipe.python.solutions.pose as mp_pose
+        import mediapipe.python.solutions.drawing_utils as mp_drawing
+        import mediapipe.python.solutions.drawing_styles as mp_drawing_styles
+    except Exception as inner_e:
+        st.error("MediaPipe 載入失敗！")
+        st.warning(f"初步錯誤: {e}")
+        st.warning(f"深層錯誤: {inner_e}")
+        
+        # 顯示已安裝套件清單，幫香草確認 NumPy 版本
+        import subprocess
+        result = subprocess.run([sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True)
+        with st.expander("查看目前安裝套件 (Debug Use)"):
+            st.code(result.stdout)
+        st.stop()
 
 
 def calculate_angle(a, b, c):
