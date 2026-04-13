@@ -1,4 +1,4 @@
 streamlit
-opencv-python-headless==4.10.0.84  # 或 4.9.0.80，如果 4.10 有問題再降
+opencv-python-headless==4.10.0.84
 mediapipe==0.10.11
 numpy
