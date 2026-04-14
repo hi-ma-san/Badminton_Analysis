@@ -77,12 +77,24 @@ if uploaded_file is not None:
             input_path = tfile.name
 
         cap = cv2.VideoCapture(input_path)
+
+        orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
+        max_dim = 1080
+        if orig_width > orig_height: # 橫向
+            target_w = max_dim
+            target_h = int(max_dim * (orig_height / orig_width))
+        else: # 直向
+            target_h = max_dim
+            target_w = int(max_dim * (orig_width / orig_height))
+
         output_path = os.path.join(tempfile.gettempdir(), "analyzed_video.mp4")
+        
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_path, fourcc, fps, (1080, 640))
+        out = cv2.VideoWriter(output_path, fourcc, fps, (target_w, target_h))
 
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -99,11 +111,15 @@ if uploaded_file is not None:
                 if not ret:
                     break
 
-                frame = cv2.resize(frame, (1080, 640))
+                
+                frame = cv2.resize(frame, (target_w, target_h))
+                h, w = frame.shape[:2]
+                
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 results = pose.process(frame_rgb)
 
                 if results.pose_landmarks:
+                    lm = results.pose_landmarks.landmark
                     lm = results.pose_landmarks.landmark
                     h, w = frame.shape[:2]
 
