@@ -240,31 +240,37 @@ if uploaded_file is not None:
         st.rerun()
 
     else:
-        st.success("分析完成！可以點擊下方按鈕下載囉 (σ′▽‵)′▽‵)σ")
-        
-        # 保持最原始的單純邏輯：只要這個會話還存活，就無條件允許下載與重新分析
-        # 記憶體中的數據會負責撐起這一切，我們不用管實體硬碟此時有沒有被全域大掃除砍掉
-        with open(st.session_state.analyzed_path, "rb") as file:
-            st.download_button(
-                label="下載分析結果影片",
-                data=file,
-                file_name="badminton_analysis.mp4",
-                mime="video/mp4"
-            )
+        if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
+            st.success("分析完成！可以點擊下方按鈕下載囉 (σ′▽‵)′▽‵)σ")
+            
+            # 實體檔案確認存在，才安全地開啟並渲染下載按鈕
+            with open(st.session_state.analyzed_path, "rb") as file:
+                st.download_button(
+                    label="下載分析結果影片",
+                    data=file,
+                    file_name="badminton_analysis.mp4",
+                    mime="video/mp4"
+                )
 
-        if st.button("重新分析該影片"):
-            # 如果實體硬碟檔案還在，重來前順手清掉它，避免短時間內重複堆積
-            if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
-                try: 
-                    os.remove(st.session_state.current_input_path)
-                    print(f"[USER ACTION] 使用者點擊重新分析，已刪除硬碟輸入檔: {os.path.basename(st.session_state.current_input_path)}")
-                except: pass
-            if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
-                try: 
-                    os.remove(st.session_state.analyzed_path)
-                    print(f"[USER ACTION] 使用者點擊重新分析，已刪除硬碟輸入檔: {os.path.basename(st.session_state.analyzed_path)}")
-                except: pass
+            if st.button("重新分析該影片"):
+                if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
+                    try: os.remove(st.session_state.current_input_path)
+                    except: pass
+                if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
+                    try: os.remove(st.session_state.analyzed_path)
+                    except: pass
+                    
+                st.session_state.analyzed_path = None
+                st.session_state.current_input_path = None
+                st.rerun()
                 
+        else:
+            # 如果點擊下載按鈕引發 Rerun 時檔案已經被砍了
+            st.error("該影片已超過快取存活時間，暫存檔案已被系統安全回收。")
+            
             st.session_state.analyzed_path = None
             st.session_state.current_input_path = None
-            st.rerun()
+            st.session_state.last_uploaded_file = None
+            
+            if st.button("返回上傳介面重新上傳"):
+                st.rerun()
