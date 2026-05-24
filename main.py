@@ -9,7 +9,7 @@ import uuid
 import time
 
 # ======== 全域定時自動清理機制 (15分鐘 = 900秒) ========
-def safe_auto_cleanup(max_age_seconds=30):
+def safe_auto_cleanup(max_age_seconds=900):
     """
     定期檢查並清除超過指定存活時間的暫存檔案。
     透過比對檔案最後修改時間與當前時間，避免誤刪正在處理中的檔案。
@@ -33,12 +33,12 @@ def safe_auto_cleanup(max_age_seconds=30):
 
 
         # debug
-        if existing_files:
-            with st.sidebar.expander("當前 tmp/ 底下的專案暫存檔案", expanded=True):
-                for file_info in existing_files:
-                    st.info(file_info)
-        else:
-            st.sidebar.success("tmp is clean")
+        # if existing_files:
+        #     with st.sidebar.expander("當前 tmp/ 底下的專案暫存檔案", expanded=True):
+        #         for file_info in existing_files:
+        #             st.info(file_info)
+        # else:
+        #     st.sidebar.success("tmp is clean")
     except Exception as global_err:
         print(f"[CACHE GLOBAL ERROR] 讀取資料夾失敗: {global_err}")
 
