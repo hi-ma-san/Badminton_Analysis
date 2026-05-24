@@ -198,7 +198,7 @@ if uploaded_file is not None:
                     angle = calculate_angle(shoulder, elbow, wrist)
                     angle_history.append(angle)
                     color = (0, 255, 0)
-                    text = f"Elbow angle: {int(angle)}°"
+                    text = f"Elbow angle: {int(angle)} deg"
                     if angle < 100:
                         color = (0, 0, 255)
                         text += " (Too bent)"
