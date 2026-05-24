@@ -16,7 +16,7 @@ def safe_auto_cleanup(max_age_seconds=30):
     """
     temp_dir = tempfile.gettempdir()
     now = time.time()
-    
+    existing_files = []
     try:
         for f in os.listdir(temp_dir):
             # 僅針對此專案產生的特定前綴檔案進行清理
@@ -24,11 +24,21 @@ def safe_auto_cleanup(max_age_seconds=30):
                 f_path = os.path.join(temp_dir, f)
                 file_age = now - os.path.getmtime(f_path)
                 print(f"[FILE TIME] 發現專案檔案: {f} | 已存活: {int(file_age)} 秒")
+                existing_files.append(f"檔案: {f} (已存活: {file_age} 秒)")
                 
                 # 超過指定秒數未更新則執行刪除
                 if now - os.path.getmtime(f_path) > max_age_seconds:
                     os.remove(f_path)
                     print(f"[CACHE CLEANUP] 成功自動清除過期實體檔案: {f}")
+
+
+        # debug
+        if existing_files:
+            with st.sidebar.expander("當前 tmp/ 底下的專案暫存檔案", expanded=True):
+                for file_info in existing_files:
+                    st.info(file_info)
+        else:
+            st.sidebar.success("tmp is clean")
     except Exception as global_err:
         print(f"[CACHE GLOBAL ERROR] 讀取資料夾失敗: {global_err}")
 
