@@ -21,13 +21,15 @@ def safe_auto_cleanup(max_age_seconds=30):
         for f in os.listdir(temp_dir):
             # 僅針對此專案產生的特定前綴檔案進行清理
             if f.startswith("bmt_in_") or f.startswith("bmt_out_"):
+                file_age = now - os.path.getmtime(f_path)
+                print(f"[FILE TIME] 發現專案檔案: {f} | 已存活: {int(file_age)} 秒")
                 f_path = os.path.join(temp_dir, f)
                 # 超過指定秒數未更新則執行刪除
                 if now - os.path.getmtime(f_path) > max_age_seconds:
                     os.remove(f_path)
                     print(f"[CACHE CLEANUP] 成功自動清除過期實體檔案: {f}")
-    except Exception:
-        pass
+    except Exception as global_err:
+        print(f"[CACHE GLOBAL ERROR] 讀取資料夾失敗: {global_err}")
 
 # 每次調用此腳本時觸發全域快取檢查
 safe_auto_cleanup()
@@ -254,11 +256,17 @@ if uploaded_file is not None:
 
             if st.button("重新分析該影片"):
                 if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
-                    try: os.remove(st.session_state.current_input_path)
-                    except: pass
+                    try: 
+                        os.remove(st.session_state.current_input_path)
+                        print(f"[USER ACTION] 成功手動刪除輸入檔: {os.path.basename(st.session_state.current_input_path)}")
+                    except Exception as e: 
+                        print(f"[USER ACTION ERROR] 輸入檔被系統鎖定刪除失敗! 原因: {e}")
                 if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
-                    try: os.remove(st.session_state.analyzed_path)
-                    except: pass
+                    try: 
+                        os.remove(st.session_state.analyzed_path)
+                        print(f"[USER ACTION] 成功手動刪除輸出檔: {os.path.basename(st.session_state.analyzed_path)}")
+                    except Exception as e: 
+                        print(f"[USER ACTION ERROR] 輸出檔被系統鎖定刪除失敗! 原因: {e}")
                     
                 st.session_state.analyzed_path = None
                 st.session_state.current_input_path = None
@@ -266,11 +274,10 @@ if uploaded_file is not None:
                 
         else:
             # 如果點擊下載按鈕引發 Rerun 時檔案已經被砍了
-            st.error("該影片已超過快取存活時間，暫存檔案已被系統安全回收。")
+            st.error("該影片已超過快取存活時間，暫存檔案已被系統安全回收，請重新分析。")
             
             st.session_state.analyzed_path = None
             st.session_state.current_input_path = None
-            st.session_state.last_uploaded_file = None
             
             if st.button("返回上傳介面重新上傳"):
                 st.rerun()
