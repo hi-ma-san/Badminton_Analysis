@@ -5,16 +5,40 @@ import numpy as np
 from collections import deque
 import tempfile
 import os
+import uuid
+import time
 
-# ======== MediaPipe 初始化 (增加錯誤捕捉) ========
+# ======== 全域定時自動清理機制 (15分鐘 = 900秒) ========
+def safe_auto_cleanup(max_age_seconds=30):
+    """
+    定期檢查並清除超過指定存活時間的暫存檔案。
+    透過比對檔案最後修改時間與當前時間，避免誤刪正在處理中的檔案。
+    """
+    temp_dir = tempfile.gettempdir()
+    now = time.time()
+    
+    try:
+        for f in os.listdir(temp_dir):
+            # 僅針對此專案產生的特定前綴檔案進行清理
+            if f.startswith("bmt_in_") or f.startswith("bmt_out_"):
+                f_path = os.path.join(temp_dir, f)
+                # 超過指定秒數未更新則執行刪除
+                if now - os.path.getmtime(f_path) > max_age_seconds:
+                    os.remove(f_path)
+    except Exception:
+        pass
+
+# 每次調用此腳本時觸發全域快取檢查
+safe_auto_cleanup()
+
+
+# ======== MediaPipe 初始化 (含錯誤捕捉) ========
 try:
     import mediapipe as mp
     mp_pose = mp.solutions.pose
     mp_drawing = mp.solutions.drawing_utils
     mp_drawing_styles = mp.solutions.drawing_styles
 except (ImportError, AttributeError) as e:
-
-    # use deep import to provide more detailed error information
     try:
         import mediapipe.python.solutions.pose as mp_pose
         import mediapipe.python.solutions.drawing_utils as mp_drawing
@@ -24,7 +48,6 @@ except (ImportError, AttributeError) as e:
         st.warning(f"初步錯誤: {e}")
         st.warning(f"深層錯誤: {inner_e}")
         
-        # display installed packages for debugging
         import subprocess
         result = subprocess.run([sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True)
         with st.expander("查看目前安裝套件 (Debug Use)"):
@@ -58,23 +81,46 @@ def calculate_speed(prev, curr, fps):
 st.set_page_config(page_title="羽球姿勢分析", page_icon="🏸")
 st.title("羽球動作技術AI 分析系統 öㅅö")
 
+# 初始化 Session 狀態變數
 if 'analyzed_path' not in st.session_state:
     st.session_state.analyzed_path = None
 if 'last_uploaded_file' not in st.session_state:
     st.session_state.last_uploaded_file = None
+if 'current_input_path' not in st.session_state:
+    st.session_state.current_input_path = None
 
 uploaded_file = st.file_uploader("選擇影片檔案...", type=["mp4", "mov", "avi"])
 
+# ======== 使用者更換上傳檔案時，主動清除該會話之前的舊暫存檔 ========
 if uploaded_file is not None and uploaded_file.name != st.session_state.last_uploaded_file:
+    # 移除舊的輸入來源暫存檔
+    if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
+        try:
+            os.remove(st.session_state.current_input_path)
+        except:
+            pass
+    # 移除舊的輸出分析結果檔
+    if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
+        try:
+            os.remove(st.session_state.analyzed_path)
+        except:
+            pass
+            
     st.session_state.analyzed_path = None
+    st.session_state.current_input_path = None
     st.session_state.last_uploaded_file = uploaded_file.name
+
 
 if uploaded_file is not None:
     if st.session_state.analyzed_path is None:
-        # 使用更安全的方式處理暫存檔
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tfile:
+        # 使用 UUID 產生唯一識別碼，避免多使用者並行時發生檔名衝突
+        user_uuid = uuid.uuid4().hex
+        
+        with tempfile.NamedTemporaryFile(delete=False, prefix=f"bmt_in_{user_uuid}_", suffix='.mp4') as tfile:
             tfile.write(uploaded_file.read())
             input_path = tfile.name
+        
+        st.session_state.current_input_path = input_path
 
         cap = cv2.VideoCapture(input_path)
 
@@ -83,6 +129,7 @@ if uploaded_file is not None:
         fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
+        # 根據影片原始長寬比，動態調整輸出尺寸，防止直向或非標準比例影片變形失真
         max_dim = 1080
         if orig_width > orig_height: # 橫向
             target_w = max_dim
@@ -91,7 +138,8 @@ if uploaded_file is not None:
             target_h = max_dim
             target_w = int(max_dim * (orig_width / orig_height))
 
-        output_path = os.path.join(tempfile.gettempdir(), "analyzed_video.mp4")
+        # 輸出路徑同樣綁定該使用者的 UUID
+        output_path = os.path.join(tempfile.gettempdir(), f"bmt_out_{user_uuid}.mp4")
         
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (target_w, target_h))
@@ -99,7 +147,6 @@ if uploaded_file is not None:
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        # ======== 與 Mediapipe w.py 相同的分析狀態 ========
         trajectory = deque(maxlen=30)
         angle_history = deque(maxlen=30)
         prev_wrist = None
@@ -111,7 +158,6 @@ if uploaded_file is not None:
                 if not ret:
                     break
 
-                
                 frame = cv2.resize(frame, (target_w, target_h))
                 h, w = frame.shape[:2]
                 
@@ -120,8 +166,6 @@ if uploaded_file is not None:
 
                 if results.pose_landmarks:
                     lm = results.pose_landmarks.landmark
-                    lm = results.pose_landmarks.landmark
-                    h, w = frame.shape[:2]
 
                     shoulder = [
                         lm[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x * w,
@@ -136,7 +180,7 @@ if uploaded_file is not None:
                         lm[mp_pose.PoseLandmark.RIGHT_WRIST.value].y * h
                     ]
 
-                    # Elbow angle
+                    # 關節角度計算與視覺化標記
                     angle = calculate_angle(shoulder, elbow, wrist)
                     angle_history.append(angle)
                     color = (0, 255, 0)
@@ -149,7 +193,7 @@ if uploaded_file is not None:
                         text += " (Too straight)"
                     cv2.putText(frame, text, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-                    # Consistency
+                    # 動作一致性評估
                     if len(angle_history) >= 5:
                         std_angle = np.std(angle_history)
                         consistency_score = max(0, 100 - std_angle)
@@ -158,7 +202,7 @@ if uploaded_file is not None:
                     cv2.putText(frame, f"Consistency: {int(consistency_score)}%", (30, 150),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
-                    # Draw landmarks & trajectory
+                    # 繪製骨架節點與軌跡
                     mp_drawing.draw_landmarks(
                         frame,
                         results.pose_landmarks,
@@ -175,7 +219,7 @@ if uploaded_file is not None:
                         line_color = (int(255 * speed_norm), int(255 * (1 - speed_norm)), 0)
                         cv2.line(frame, trajectory[i - 1], trajectory[i], line_color, 4)
 
-                    # Swing speed
+                    # 揮拍速度估算
                     current_speed = calculate_speed(prev_wrist, wrist, fps)
                     cv2.putText(frame, f"Swing speed: {current_speed:.1f} px/s", (30, 100),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
@@ -196,14 +240,29 @@ if uploaded_file is not None:
 
     else:
         st.success("分析完成！可以點擊下方按鈕下載囉 (σ′▽‵)′▽‵)σ")
-        with open(st.session_state.analyzed_path, "rb") as file:
-            st.download_button(
-                label="下載分析結果影片",
-                data=file,
-                file_name="badminton_analysis.mp4",
-                mime="video/mp4"
-            )
+        st.info("為了維護伺服器空間，分析檔案將在生成15分鐘後自動清除！")
+        
+        # 下載前確認實體檔案是否存在，避免在下載瞬間被全域清理機制移除
+        if os.path.exists(st.session_state.analyzed_path):
+            with open(st.session_state.analyzed_path, "rb") as file:
+                st.download_button(
+                    label="下載分析結果影片",
+                    data=file,
+                    file_name="badminton_analysis.mp4",
+                    mime="video/mp4"
+                )
+        else:
+            st.error("該影片已超過 15 分鐘存活時間，請點擊下方按鈕重新分析。")
 
         if st.button("重新分析該影片"):
+            # 點擊重新分析時，主動釋放並刪除當前與該會話相關的實體檔案
+            if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
+                try: os.remove(st.session_state.current_input_path)
+                except: pass
+            if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
+                try: os.remove(st.session_state.analyzed_path)
+                except: pass
+                
             st.session_state.analyzed_path = None
+            st.session_state.current_input_path = None
             st.rerun()
