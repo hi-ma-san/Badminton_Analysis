@@ -21,9 +21,10 @@ def safe_auto_cleanup(max_age_seconds=30):
         for f in os.listdir(temp_dir):
             # 僅針對此專案產生的特定前綴檔案進行清理
             if f.startswith("bmt_in_") or f.startswith("bmt_out_"):
+                f_path = os.path.join(temp_dir, f)
                 file_age = now - os.path.getmtime(f_path)
                 print(f"[FILE TIME] 發現專案檔案: {f} | 已存活: {int(file_age)} 秒")
-                f_path = os.path.join(temp_dir, f)
+                
                 # 超過指定秒數未更新則執行刪除
                 if now - os.path.getmtime(f_path) > max_age_seconds:
                     os.remove(f_path)
