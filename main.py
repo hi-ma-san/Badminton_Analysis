@@ -25,6 +25,7 @@ def safe_auto_cleanup(max_age_seconds=30):
                 # 超過指定秒數未更新則執行刪除
                 if now - os.path.getmtime(f_path) > max_age_seconds:
                     os.remove(f_path)
+                    print(f"[CACHE CLEANUP] 成功自動清除過期實體檔案: {f}")
     except Exception:
         pass
 
@@ -240,41 +241,30 @@ if uploaded_file is not None:
 
     else:
         st.success("分析完成！可以點擊下方按鈕下載囉 (σ′▽‵)′▽‵)σ")
-        st.info("為了維護伺服器空間，分析檔案將在生成15分鐘後自動清除！")
         
-        # 每次渲染前，即時檢查實體硬碟檔案是否真的還在
-        file_exists = os.path.exists(st.session_state.analyzed_path) if st.session_state.analyzed_path else False
-        
-        if file_exists:
-            # 只有實體檔案在硬碟裡，才去開啟並渲染下載按鈕
-            with open(st.session_state.analyzed_path, "rb") as file:
-                st.download_button(
-                    label="下載分析結果影片",
-                    data=file,
-                    file_name="badminton_analysis.mp4",
-                    mime="video/mp4"
-                )
-            
-            if st.button("重新分析該影片"):
-                if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
-                    try: os.remove(st.session_state.current_input_path)
-                    except: pass
-                if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
-                    try: os.remove(st.session_state.analyzed_path)
-                    except: pass
-                    
-                st.session_state.analyzed_path = None
-                st.session_state.current_input_path = None
-                st.rerun()
+        # 保持最原始的單純邏輯：只要這個會話還存活，就無條件允許下載與重新分析
+        # 記憶體中的數據會負責撐起這一切，我們不用管實體硬碟此時有沒有被全域大掃除砍掉
+        with open(st.session_state.analyzed_path, "rb") as file:
+            st.download_button(
+                label="下載分析結果影片",
+                data=file,
+                file_name="badminton_analysis.mp4",
+                mime="video/mp4"
+            )
+
+        if st.button("重新分析該影片"):
+            # 如果實體硬碟檔案還在，重來前順手清掉它，避免短時間內重複堆積
+            if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
+                try: 
+                    os.remove(st.session_state.current_input_path)
+                    print(f"[USER ACTION] 使用者點擊重新分析，已刪除硬碟輸入檔: {os.path.basename(st.session_state.current_input_path)}")
+                except: pass
+            if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
+                try: 
+                    os.remove(st.session_state.analyzed_path)
+                    print(f"[USER ACTION] 使用者點擊重新分析，已刪除硬碟輸入檔: {os.path.basename(st.session_state.analyzed_path)}")
+                except: pass
                 
-        else:
-            # 如果實體檔案已經不見了，不渲染下載按鈕，並強制重置所有會話狀態
-            st.error("該影片已超過快取存活時間，暫存檔案已被系統刪除。")
-            
             st.session_state.analyzed_path = None
             st.session_state.current_input_path = None
-            st.session_state.last_uploaded_file = None
-            
-            # 提供一個明確的按鈕讓前端徹底重置
-            if st.button("返回上傳介面重新上傳"):
-                st.rerun()
+            st.rerun()
