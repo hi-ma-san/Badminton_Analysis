@@ -249,18 +249,33 @@ if uploaded_file is not None:
 
                         # ------------------ 模式二：重心分析 (核心四點) ------------------
                         elif st.session_state.analysis_mode == "gravity":
-                            # 讀取左肩、右肩、左髖、右髖的二維像素座標
-                            ls = [lm[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x * w, lm[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y * h]
-                            rs = [lm[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x * w, lm[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y * h]
-                            lh = [lm[mp_pose.PoseLandmark.LEFT_HIP.value].x * w, lm[mp_pose.PoseLandmark.LEFT_HIP.value].y * h]
-                            rh = [lm[mp_pose.PoseLandmark.RIGHT_HIP.value].x * w, lm[mp_pose.PoseLandmark.RIGHT_HIP.value].y * h]
+                            # 1. 軀幹核心組 (Trunk: 兩肩 + 兩髖) -> 權重 50%
+                            ls = np.array([lm[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x * w, lm[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y * h])
+                            rs = np.array([lm[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x * w, lm[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y * h])
+                            lh = np.array([lm[mp_pose.PoseLandmark.LEFT_HIP.value].x * w, lm[mp_pose.PoseLandmark.LEFT_HIP.value].y * h])
+                            rh = np.array([lm[mp_pose.PoseLandmark.RIGHT_HIP.value].x * w, lm[mp_pose.PoseLandmark.RIGHT_HIP.value].y * h])
+                            trunk_center = (ls + rs + lh + rh) / 4.0
 
-                            # 運用幾何中心公式計算核心重心點 (cx, cy)
-                            cx = int((ls[0] + rs[0] + lh[0] + rh[0]) / 4)
-                            cy = int((ls[1] + rs[1] + lh[1] + rh[1]) / 4)
+                            # 2. 上肢結構組 (Arms: 兩肘 + 兩腕) -> 權重 10%
+                            le = np.array([lm[mp_pose.PoseLandmark.LEFT_ELBOW.value].x * w, lm[mp_pose.PoseLandmark.LEFT_ELBOW.value].y * h])
+                            re = np.array([lm[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x * w, lm[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y * h])
+                            lw = np.array([lm[mp_pose.PoseLandmark.LEFT_WRIST.value].x * w, lm[mp_pose.PoseLandmark.LEFT_WRIST.value].y * h])
+                            rw = np.array([lm[mp_pose.PoseLandmark.RIGHT_WRIST.value].x * w, lm[mp_pose.PoseLandmark.RIGHT_WRIST.value].y * h])
+                            arms_center = (le + re + lw + rw) / 4.0
+
+                            # 3. 下肢結構組 (Legs: 兩膝 + 兩踝) -> 權重 40%
+                            lk = np.array([lm[mp_pose.PoseLandmark.LEFT_KNEE.value].x * w, lm[mp_pose.PoseLandmark.LEFT_KNEE.value].y * h])
+                            rk = np.array([lm[mp_pose.PoseLandmark.RIGHT_KNEE.value].x * w, lm[mp_pose.PoseLandmark.RIGHT_KNEE.value].y * h])
+                            lan = np.array([lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].x * w, lm[mp_pose.PoseLandmark.LEFT_ANKLE.value].y * h])
+                            ran = np.array([lm[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x * w, lm[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y * h])
+                            legs_center = (lk + rk + lan + ran) / 4.0
+
+                            # 4. 進行運動科學加權合成計算
+                            gravity_center = (0.5 * trunk_center) + (0.1 * arms_center) + (0.4 * legs_center)
+                            cx, cy = int(gravity_center[0]), int(gravity_center[1])
                             gravity_trajectory.append((cx, cy))
 
-                            # 繪製全身體重幾何重心點 (紅色半徑7實心圓)
+                            # 繪製全身體重加權幾何重心點 (紅色半徑7實心圓)
                             cv2.circle(frame, (cx, cy), 7, (0, 0, 255), -1)
 
                             # 繪製步伐位移之運動軌跡連續線段 (綠色粗度3)
@@ -270,7 +285,7 @@ if uploaded_file is not None:
                                 cv2.line(frame, gravity_trajectory[i - 1], gravity_trajectory[i], (0, 255, 0), 3)
 
                             # 於影像左上方渲染功能模式提示文字
-                            cv2.putText(frame, "Body Gravity Center Tracking", (30, 50), 
+                            cv2.putText(frame, "12-Point Body Gravity Tracking", (30, 50), 
                                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
 
                     out.write(frame)
