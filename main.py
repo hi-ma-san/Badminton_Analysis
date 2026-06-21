@@ -96,6 +96,9 @@ if 'current_input_path' not in st.session_state:
 # 控制當前選擇的分析模式（None: 等待選擇, 'angle': 角度分析, 'gravity': 重心分析）
 if 'analysis_mode' not in st.session_state:
     st.session_state.analysis_mode = None
+# 記錄使用者選擇的慣用手偏好（'Right': 右手, 'Left': 左手）
+if 'hand_preference' not in st.session_state:
+    st.session_state.hand_preference = "Right"
 
 uploaded_file = st.file_uploader("選擇影片檔案...", type=["mp4", "mov", "avi"])
 
@@ -112,18 +115,25 @@ if uploaded_file is not None and uploaded_file.name != st.session_state.last_upl
             
     st.session_state.analyzed_path = None
     st.session_state.current_input_path = None
-    st.session_state.analysis_mode = None  # 切換檔案時重置分析模式
+    st.session_state.analysis_mode = None 
+    st.session_state.hand_preference = "Right"
     st.session_state.last_uploaded_file = uploaded_file.name
 
 
 if uploaded_file is not None:
     if st.session_state.analyzed_path is None:
         
-        st.info("影片上傳成功，請選擇您要執行的 AI 分析項目：")
+        st.info("影片上傳成功，請選擇您要執行的分析項目：")
+
+        hand_option = st.radio("請選擇持拍慣用手：", ["右手持拍", "左手持拍"], horizontal=True)
+        
+        st.write("---")
+
         col1, col2 = st.columns(2)
         with col1:
             if st.button("啟動角度分析", use_container_width=True):
                 st.session_state.analysis_mode = "angle"
+                st.session_state.hand_preference = "Left" if hand_option == "左手持拍" else "Right"
         with col2:
             if st.button("啟動重心分析", use_container_width=True):
                 st.session_state.analysis_mode = "gravity"
@@ -136,7 +146,7 @@ if uploaded_file is not None:
             with tempfile.NamedTemporaryFile(delete=False, prefix=f"bmt_in_{user_uuid}_", suffix='.mp4') as tfile:
                 tfile.write(uploaded_file.read())
                 input_path = tfile.name
-            
+
             st.session_state.current_input_path = input_path
 
             cap = cv2.VideoCapture(input_path)
@@ -188,24 +198,28 @@ if uploaded_file is not None:
 
                         # ------------------ 模式一：角度分析 ------------------
                         if st.session_state.analysis_mode == "angle":
-                            shoulder = [
-                                lm[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x * w,
-                                lm[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y * h
-                            ]
-                            elbow = [
-                                lm[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x * w,
-                                lm[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y * h
-                            ]
-                            wrist = [
-                                lm[mp_pose.PoseLandmark.RIGHT_WRIST.value].x * w,
-                                lm[mp_pose.PoseLandmark.RIGHT_WRIST.value].y * h
-                            ]
+                            # 依據參數動態指派肩、肘、腕關鍵點點位索引
+                            if st.session_state.hand_preference == "Right":
+                                joint_shoulder = mp_pose.PoseLandmark.RIGHT_SHOULDER.value
+                                joint_elbow    = mp_pose.PoseLandmark.RIGHT_ELBOW.value
+                                joint_wrist    = mp_pose.PoseLandmark.RIGHT_WRIST.value
+                                prefix_text    = "Right"
+                            else:
+                                joint_shoulder = mp_pose.PoseLandmark.LEFT_SHOULDER.value
+                                joint_elbow    = mp_pose.PoseLandmark.LEFT_ELBOW.value
+                                joint_wrist    = mp_pose.PoseLandmark.LEFT_WRIST.value
+                                prefix_text    = "Left"
+
+                            # 依據選擇結果讀取對應側之上肢座標
+                            shoulder = [lm[joint_shoulder].x * w, lm[joint_shoulder].y * h]
+                            elbow    = [lm[joint_elbow].x * w, lm[joint_elbow].y * h]
+                            wrist    = [lm[joint_wrist].x * w, lm[joint_wrist].y * h]
 
                             # 關節角度計算與視覺化標記
                             angle = calculate_angle(shoulder, elbow, wrist)
                             angle_history.append(angle)
                             color = (0, 255, 0)
-                            text = f"Elbow angle: {int(angle)} deg"
+                            text = f"{prefix_text} Elbow: {int(angle)} deg"
                             if angle < 100:
                                 color = (0, 0, 255)
                                 text += " (Too bent)"
