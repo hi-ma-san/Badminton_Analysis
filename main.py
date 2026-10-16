@@ -334,30 +334,14 @@ if uploaded_file is not None:
             # 將影片二進位檔案讀出並編碼為 Base64
             with open(st.session_state.analyzed_path, "rb") as f:
                 video_bytes = f.read()
-            b64_str = base64.b64encode(video_bytes).decode()
 
-            # 使用純前端 HTML 下載鏈結，徹底繞過後端 ASGI 與 Gzip 中介層
-            download_html = f'''
-            <a href="data:video/mp4;base64,{b64_str}" download="badminton_analysis.mp4" style="text-decoration: none;">
-                <div style="
-                    display: inline-block;
-                    width: 100%;
-                    text-align: center;
-                    padding: 0.6rem 1rem;
-                    background-color: #ff4b4b;
-                    color: white;
-                    border-radius: 0.5rem;
-                    font-weight: 600;
-                    margin-top: 0.5rem;
-                    margin-bottom: 1rem;
-                    cursor: pointer;
-                    user-select: none;
-                ">
-                    下載分析結果影片
-                </div>
-            </a>
-            '''
-            st.markdown(download_html, unsafe_allow_html=True)
+            st.download_button(
+                label="下載分析結果影片 (MP4)",
+                data=video_bytes,
+                file_name="badminton_analysis.mp4",
+                mime="video/mp4",
+                use_container_width=True
+            )
 
             if st.button("重新分析該影片", use_container_width=True):
                 if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
