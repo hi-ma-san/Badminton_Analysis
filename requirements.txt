@@ -1,4 +1,6 @@
-streamlit==1.50.0
+streamlit==1.40.2
+starlette==0.38.2
+uvicorn==0.30.6
 opencv-python-headless==4.10.0.84
 mediapipe==0.10.11
 numpy<2.0.0
