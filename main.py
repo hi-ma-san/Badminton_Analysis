@@ -168,8 +168,11 @@ if uploaded_file is not None:
             # 輸出路徑同樣綁定該使用者的 UUID
             output_path = os.path.join(tempfile.gettempdir(), f"bmt_out_{user_uuid}.mp4")
             
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            fourcc = cv2.VideoWriter_fourcc(*'avc1')
             out = cv2.VideoWriter(output_path, fourcc, fps, (target_w, target_h))
+            if not out.isOpened():
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                out = cv2.VideoWriter(output_path, fourcc, fps, (target_w, target_h))
 
             progress_bar = st.progress(0)
             status_text = st.empty()
@@ -319,9 +322,11 @@ if uploaded_file is not None:
             st.success("分析完成！可以點擊下方按鈕下載囉 (σ′▽‵)′▽‵)σ")
             
             with open(st.session_state.analyzed_path, "rb") as file:
+                video_bytes = file.read()
+
                 st.download_button(
                     label="下載分析結果影片",
-                    data=file,
+                    data=video_bytes,
                     file_name="badminton_analysis.mp4",
                     mime="video/mp4"
                 )
