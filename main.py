@@ -314,9 +314,11 @@ if uploaded_file is not None:
 
                     out.write(frame)
                     count += 1
-                    if frame_count > 0:
-                        progress_bar.progress(min(count / frame_count, 1.0))
-                    status_text.text(f"正在分析... {count}/{frame_count} 幀")
+                    if count % 10 == 0 or count == frame_count:
+                        if frame_count > 0:
+                            progress_bar.progress(min(count / frame_count, 1.0))
+                        status_text.text(f"正在分析... {count}/{frame_count} 幀")
+                        time.sleep(0.001)
 
             cap.release()
             out.release()
@@ -336,7 +338,7 @@ if uploaded_file is not None:
                 video_bytes = f.read()
 
             st.download_button(
-                label="下載分析結果影片 (MP4)",
+                label="下載分析結果影片",
                 data=video_bytes,
                 file_name="badminton_analysis.mp4",
                 mime="video/mp4",
