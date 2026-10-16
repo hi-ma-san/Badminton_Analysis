@@ -7,6 +7,7 @@ import tempfile
 import os
 import uuid
 import time
+import base64
 
 # ======== 全域定時自動清理機制 (15分鐘 = 900秒) ========
 def safe_auto_cleanup(max_age_seconds=900):
@@ -328,35 +329,51 @@ if uploaded_file is not None:
             os.path.exists(st.session_state.analyzed_path) and 
             os.path.getsize(st.session_state.analyzed_path) > 1024):
             
-            st.success("分析完成。可點擊下方按鈕下載檔案。")
+            st.success("分析完成！可以點擊下方按鈕下載囉 (σ′▽‵)′▽‵)σ")
             
-            with open(st.session_state.analyzed_path, "rb") as file:
-                video_bytes = file.read()
+            # 將影片二進位檔案讀出並編碼為 Base64
+            with open(st.session_state.analyzed_path, "rb") as f:
+                video_bytes = f.read()
+            b64_str = base64.b64encode(video_bytes).decode()
 
-            st.download_button(
-                label="下載分析結果影片",
-                data=video_bytes,
-                file_name="badminton_analysis.mp4",
-                mime="video/mp4"
-            )
+            # 使用純前端 HTML 下載鏈結，徹底繞過後端 ASGI 與 Gzip 中介層
+            download_html = f'''
+            <a href="data:video/mp4;base64,{b64_str}" download="badminton_analysis.mp4" style="text-decoration: none;">
+                <div style="
+                    display: inline-block;
+                    width: 100%;
+                    text-align: center;
+                    padding: 0.6rem 1rem;
+                    background-color: #ff4b4b;
+                    color: white;
+                    border-radius: 0.5rem;
+                    font-weight: 600;
+                    margin-top: 0.5rem;
+                    margin-bottom: 1rem;
+                    cursor: pointer;
+                    user-select: none;
+                ">
+                    下載分析結果影片
+                </div>
+            </a>
+            '''
+            st.markdown(download_html, unsafe_allow_html=True)
 
-            if st.button("重新分析該影片"):
+            if st.button("重新分析該影片", use_container_width=True):
                 if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
                     try: 
                         os.remove(st.session_state.current_input_path)
-                        print(f"[USER ACTION] Successfully deleted input file: {os.path.basename(st.session_state.current_input_path)}")
-                    except Exception as e: 
-                        print(f"[USER ACTION ERROR] Input file locked: {e}")
+                    except Exception: 
+                        pass
                 if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
                     try: 
                         os.remove(st.session_state.analyzed_path)
-                        print(f"[USER ACTION] Successfully deleted output file: {os.path.basename(st.session_state.analyzed_path)}")
-                    except Exception as e: 
-                        print(f"[USER ACTION ERROR] Output file locked: {e}")
+                    except Exception: 
+                        pass
                     
                 st.session_state.analyzed_path = None
                 st.session_state.current_input_path = None
-                st.session_state.analysis_mode = None  # 重置分析模式
+                st.session_state.analysis_mode = None  
                 st.rerun()
                 
         else:
