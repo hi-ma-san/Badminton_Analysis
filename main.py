@@ -168,11 +168,17 @@ if uploaded_file is not None:
             # 輸出路徑同樣綁定該使用者的 UUID
             output_path = os.path.join(tempfile.gettempdir(), f"bmt_out_{user_uuid}.mp4")
             
-            fourcc = cv2.VideoWriter_fourcc(*'avc1')
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             out = cv2.VideoWriter(output_path, fourcc, fps, (target_w, target_h))
+
+            # 若編碼器無法開啟，退回相容格式 XVID
             if not out.isOpened():
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                fourcc = cv2.VideoWriter_fourcc(*'XVID')
                 out = cv2.VideoWriter(output_path, fourcc, fps, (target_w, target_h))
+
+            if not out.isOpened():
+                st.error("影片編碼器初始化失敗，請檢查系統環境。")
+                st.stop()
 
             progress_bar = st.progress(0)
             status_text = st.empty()
@@ -318,18 +324,21 @@ if uploaded_file is not None:
             st.rerun()
 
     else:
-        if st.session_state.analyzed_path and os.path.exists(st.session_state.analyzed_path):
-            st.success("分析完成！可以點擊下方按鈕下載囉 (σ′▽‵)′▽‵)σ")
+        if (st.session_state.analyzed_path and 
+            os.path.exists(st.session_state.analyzed_path) and 
+            os.path.getsize(st.session_state.analyzed_path) > 1024):
+            
+            st.success("分析完成。可點擊下方按鈕下載檔案。")
             
             with open(st.session_state.analyzed_path, "rb") as file:
                 video_bytes = file.read()
 
-                st.download_button(
-                    label="下載分析結果影片",
-                    data=video_bytes,
-                    file_name="badminton_analysis.mp4",
-                    mime="video/mp4"
-                )
+            st.download_button(
+                label="下載分析結果影片",
+                data=video_bytes,
+                file_name="badminton_analysis.mp4",
+                mime="video/mp4"
+            )
 
             if st.button("重新分析該影片"):
                 if st.session_state.current_input_path and os.path.exists(st.session_state.current_input_path):
