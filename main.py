@@ -8,7 +8,7 @@ import os
 import uuid
 import time
 import base64
-
+import gc
 # ======== 全域定時自動清理機制 (15分鐘 = 900秒) ========
 def safe_auto_cleanup(max_age_seconds=900):
     """
@@ -24,21 +24,21 @@ def safe_auto_cleanup(max_age_seconds=900):
             if f.startswith("bmt_in_") or f.startswith("bmt_out_"):
                 f_path = os.path.join(temp_dir, f)
                 file_age = now - os.path.getmtime(f_path)
-                print(f"[FILE TIME] Found project file: {f} | Age: {int(file_age)} seconds")
+                print(f"[FILE TIME] Found project file: {f} | Age: {int(file_age)} seconds", flush=True)
                 existing_files.append(f"File: {f} (Age: {file_age}s)")
                 
                 # 超過指定秒數未更新則執行刪除
                 if now - os.path.getmtime(f_path) > max_age_seconds:
                     os.remove(f_path)
-                    print(f"[CACHE CLEANUP] Successfully auto-cleaned expired file: {f}")
+                    print(f"[CACHE CLEANUP] Successfully auto-cleaned expired file: {f}", flush=True)
     except Exception as global_err:
-        print(f"[CACHE GLOBAL ERROR] Failed to read temporary directory: {global_err}")
+        print(f"[CACHE GLOBAL ERROR] Failed to read temporary directory: {global_err}", flush=True)
 
 # 每次調用此腳本時觸發全域快取檢查
 safe_auto_cleanup()
 
 
-# ======== MediaPipe 初始化 (含錯誤捕捉) ========
+# ======== MediaPipe 初始化 (含錯誤捕捉 ========
 try:
     import mediapipe as mp
     mp_pose = mp.solutions.pose
@@ -120,6 +120,8 @@ if uploaded_file is not None and uploaded_file.name != st.session_state.last_upl
     st.session_state.hand_preference = "Right"
     st.session_state.last_uploaded_file = uploaded_file.name
 
+    gc.collect()
+
 
 if uploaded_file is not None:
     if st.session_state.analyzed_path is None:
@@ -139,9 +141,8 @@ if uploaded_file is not None:
             if st.button("啟動重心分析", use_container_width=True):
                 st.session_state.analysis_mode = "gravity"
         
-        # 當使用者點擊按鈕變更模式後，才執行影像處理迴圈
         if st.session_state.analysis_mode is not None:
-            # 使用 UUID 產生唯一識別碼，避免多使用者並行時發生檔名衝突
+            # 使用 UUID 產生唯一識別碼
             user_uuid = uuid.uuid4().hex
             
             with tempfile.NamedTemporaryFile(delete=False, prefix=f"bmt_in_{user_uuid}_", suffix='.mp4') as tfile:
@@ -322,6 +323,12 @@ if uploaded_file is not None:
 
             cap.release()
             out.release()
+
+            # 清理
+            del trajectory
+            del angle_history
+            del gravity_trajectory
+            gc.collect()  
 
             st.session_state.analyzed_path = output_path
             st.rerun()
